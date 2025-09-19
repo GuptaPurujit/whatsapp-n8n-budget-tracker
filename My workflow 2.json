@@ -1,0 +1,451 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {
+          "messageStatusUpdates": []
+        }
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        32
+      ],
+      "id": "a10800ce-ca77-4725-93e0-a608370929ab",
+      "name": "WhatsApp Trigger",
+      "webhookId": "fd6f6c4f-975f-49d1-9e37-8dfde3ead9e1",
+      "notesInFlow": false,
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "NBVJgRUFMWuxEoHt",
+          "name": "WhatsApp OAuth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.messages[0].text.body }}",
+        "options": {
+          "systemMessage": "# Spend Tracking Information Extractor & Categorizer  \n\n## Instructions  \nYou will get an **input message** which can either be a transaction that the user did (e.g., *“250 Paneer”* means they spent Rs. 250 on Paneer).  \n\nYour task is to:  \n1. **Extract the exact amount**.  \n2. **Identify the spend category** (Groceries, Stock/Mutual Fund, Gym, Dining Out, Travel, Rent, etc.).  \n3. **Determine the area**: Need, Want, or Invest.  \n4. If not clear, ask a **clarifying question**.  \n\n---\n\n## Reasoning Format  \n\n**Input:** <the input message>  \n**Thought:** <reasoning about extraction>  \n**Observation:** <intermediate understanding>  \n... (repeat as needed)  \n**Thought:** I now know the final answer  \n**Final Answer:** <normal text response with category, area, and clarification if needed>  \n\n---\n\n## Example Scenarios  \n\n### Scenario 1: Clear Grocery Need  \n**Input:** 250 Onions  \n**Thought:** User spent Rs. 250 on onions.  \n**Observation:** Onion is a grocery item.  \n**Thought:** Groceries are a Need.  \n**Final Answer:** You spent **₹250 on Groceries (Need)**.  \n\n---\n\n### Scenario 2: Dining Out Want  \n**Input:** 500 dinner at Pizza Hut  \n**Thought:** User spent Rs. 500 at a restaurant.  \n**Observation:** Dining out is usually a Want.  \n**Final Answer:** You spent **₹500 on Dining Out (Want)**.  \n\n---\n\n### Scenario 3: Travel (Needs Clarification)  \n**Input:** 1200 Indigo flight Delhi  \n**Thought:** Indigo is an airline → category Travel.  \n**Observation:** Could be essential (Need) or leisure (Want).  \n**Final Answer:** You spent **₹1200 on Travel**, but I need clarification — was this **work/essential (Need)** or **leisure (Want)**?  \n\n---\n\n### Scenario 4: Investment (Mutual Fund)  \n**Input:** 20000 SIP in HDFC Mutual Fund  \n**Thought:** Mutual Fund → Investments.  \n**Final Answer:** You invested **₹20000 in Mutual Funds (Invest)**.  \n\n---\n\n### Scenario 5: Ambiguous Category (Glass)  \n**Input:** 250 glass  \n**Thought:** Could be household glass, window glass, or sunglasses.  \n**Final Answer:** You spent **₹250**, but I need clarification — was this for **household, repair, or sunglasses**?  \n\n---\n\n### Scenario 6: Rent Need  \n**Input:** 15000 rent  \n**Thought:** Rent is always a Need.  \n**Final Answer:** You spent **₹15000 on Rent (Need)**.  \n\n---\n\n### Scenario 7: Gym Want  \n**Input:** 2000 Gym Membership  \n**Thought:** Gym subscription is generally a Want.  \n**Final Answer:** You spent **₹2000 on Gym (Want)**.  \n\n---\n\n### Scenario 8: Subscription Ambiguity  \n**Input:** 499 Netflix  \n**Thought:** Netflix is a subscription, usually a Want. But sometimes could be for study/work (Need).  \n**Final Answer:** You spent **₹499 on Subscriptions**, but was this for **entertainment (Want)** or **work/study (Need)**?  \n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        32
+      ],
+      "id": "c5ee60f2-0d40-4a96-a44e-45f7dbbd6a63",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        256
+      ],
+      "id": "53943fd2-a29f-4079-ba93-a5f9f76e70fe",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "mP3tmb1h1ZO4jSP1",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.output }}",
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"TransactionInfo\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"spent_amount\": {\n      \"type\": \"number\",\n      \"description\": \"The exact amount spent in INR.\"\n    },\n    \"category\": {\n      \"type\": [\"string\", \"null\"],\n      \"description\": \"Category of spend (e.g., Groceries, Rent, Travel, Dining Out, etc.).\"\n    },\n    \"area\": {\n      \"type\": [\"string\", \"null\"],\n      \"enum\": [\"Need\", \"Want\", \"Invest\", null],\n      \"description\": \"Whether the spend is a Need, Want, or Invest. Can be null if unclear.\"\n    },\n    \"comments\": {\n      \"type\": [\"string\", \"null\"],\n      \"description\": \"Short comment on what the spend was on.\"\n    },\n    \"clarification_required\": {\n      \"type\": \"boolean\",\n      \"description\": \"Whether a clarification is needed for ambiguous transactions.\"\n    },\n    \"follow_up_question\": {\n      \"type\": [\"string\", \"null\"],\n      \"description\": \"Follow-up question to ask the user if clarification_required is true. Null otherwise.\"\n    }\n  },\n  \"required\": [\"spent_amount\", \"category\", \"area\", \"clarification_required\"],\n  \"additionalProperties\": false\n}\n",
+        "options": {
+          "systemPromptTemplate": "You are an expert extraction algorithm.\nOnly extract relevant information from the text.\n\n### Instructions\n1. Based on the user input, decide if the information is complete or if you need to ask a clarification follow-up question.\n2. If the input is clear:\n   - Return a structured JSON object with the following keys:\n     - `spent_amount`\n     - `category`\n     - `area` (Need, Want, or Invest)\n     - `comments`\n     - `clarification_required` (boolean)\n     - `follow_up_question` (string, null if `clarification_required` = false)\n3. If the input is **ambiguous**:\n   - Set `clarification_required` to **true**.\n   - Provide a suitable clarification question in `follow_up_question`.\n   - Do **not** add commentary outside the JSON.\n\n### Output Format\nAlways return only the JSON object."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [
+        576,
+        32
+      ],
+      "id": "ae904d64-39c3-41f5-9d01-30bd0d56879d",
+      "name": "Information Extractor"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.clarification_required }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "b2e854e1-6c51-4e89-9a8e-2c0bec7c0c17"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "98af7ae3-9656-449e-a163-2dfd9c4aba8d",
+                    "leftValue": "={{ $json.output.clarification_required }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        928,
+        32
+      ],
+      "id": "4e75f772-fb91-45e5-8b4f-28ec5d3f7b06",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1wR9ovIwwPAG1kqO0DVfrnZTSZrZYH3dxPqGkX7dX_3E",
+          "mode": "list",
+          "cachedResultName": "Budget Tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wR9ovIwwPAG1kqO0DVfrnZTSZrZYH3dxPqGkX7dX_3E/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $('WhatsApp Trigger').item.json.messages[0].from }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Area": "={{ $json.output.area }}",
+            "Category": "={{ $json.output.category }}",
+            "Amount": "={{ $json.output.spent_amount }}",
+            "Addtional Comments": "={{ $json.output.comments }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Area",
+              "displayName": "Area",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Amount",
+              "displayName": "Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Addtional Comments",
+              "displayName": "Addtional Comments",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1216,
+        -128
+      ],
+      "id": "81d4072a-6db8-4be7-8c15-8ed005825901",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qcm7qSGXUxoRlcJC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $('WhatsApp Trigger').item.json.metadata.phone_number_id }}",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}",
+        "textBody": "={{ $json.output.follow_up_question }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        1504,
+        176
+      ],
+      "id": "2d2b9930-fa51-40cc-aad6-e54e8fccb42c",
+      "name": "Send message",
+      "webhookId": "e3a456ad-dd8c-4398-ac29-3ac3ae2ce255",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "fiQeeyMQtGEvMt1k",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Switch').item.json.output }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a **Chat Bot** that extracts and categorizes transactional information.  ### Instructions 1. Based on the user input, decide if the information is complete or if you need to ask a clarification follow-up question. 2. If the input is clear:    - Return a structured JSON object with the following keys:      - `spent_amount`      - `category`      - `area` (Need, Want, or Invest)      - `clarification_required` (boolean)      - `follow_up_question` (string, null if `clarification_required` = false) 3. If the input is ambiguous:    - Set `clarification_required` to **true**.    - Fill `follow_up_question` with the clarification to ask.    - **Ask the follow-up question using the tools you have.**  ### Output Format Always return only the JSON object."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1152,
+        176
+      ],
+      "id": "e982b00c-0af8-4830-a504-55430af2ed12",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"TransactionInfo\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"spent_amount\": {\n      \"type\": \"number\",\n      \"description\": \"The exact amount spent in INR.\"\n    },\n    \"category\": {\n      \"type\": [\"string\", \"null\"],\n      \"description\": \"Category of spend (e.g., Groceries, Rent, Travel, Dining Out, etc.).\"\n    },\n    \"area\": {\n      \"type\": [\"string\", \"null\"],\n      \"enum\": [\"Need\", \"Want\", \"Invest\", null],\n      \"description\": \"Whether the spend is a Need, Want, or Invest. Can be null if unclear.\"\n    },\n    \"comments\": {\n      \"type\": [\"string\", \"null\"],\n      \"description\": \"Short comment on what the spend was on.\"\n    },\n    \"clarification_required\": {\n      \"type\": \"boolean\",\n      \"description\": \"Whether a clarification is needed for ambiguous transactions.\"\n    },\n    \"follow_up_question\": {\n      \"type\": [\"string\", \"null\"],\n      \"description\": \"Follow-up question to ask the user if clarification_required is true. Null otherwise.\"\n    }\n  },\n  \"required\": [\"spent_amount\", \"category\", \"area\", \"clarification_required\"],\n  \"additionalProperties\": false\n}\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1232,
+        400
+      ],
+      "id": "c1b72bec-ae38-4d70-bbc2-e8c8b7edcfc1",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.messages[0].from }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+      "typeVersion": 1.5,
+      "position": [
+        368,
+        256
+      ],
+      "id": "63e4b22a-e621-452d-b499-0f98c6fcddf1",
+      "name": "Redis Chat Memory",
+      "credentials": {
+        "redis": {
+          "id": "gbZ6FcnCmhAlInu3",
+          "name": "Redis account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Information Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Information Extractor": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "49348dee-30ad-47a4-97b6-9c29128bd148",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c838cd7d5c8c09b939f2ab42d353ae6b75cd67ffea1be321ea599e308c6b3dc9"
+  },
+  "id": "ch36eNsha1j3rQyu",
+  "tags": []
+}
